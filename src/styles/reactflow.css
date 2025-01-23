@@ -1,0 +1,148 @@
+.react-flow-wrapper {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  flex-grow: 1;
+}
+
+/* Add this to ensure the button stays above ReactFlow elements */
+.react-flow-wrapper .absolute {
+  z-index: 100;
+}
+
+.react-flow__node {
+  cursor: grab;
+  font-size: 11px;
+  padding: 5px;
+  border-radius: 3px !important;
+  /* width: 80px !important; */
+  /* height: 40px !important; */
+}
+
+.react-flow__node-default {
+  font-size: 12px;
+  padding: 5px;
+  border-radius: 3px;
+  
+  /* width: 80px !important; */
+  /* height: 40px !important; */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.react-flow__node:active {
+  cursor: grabbing;
+}
+
+.react-flow__node-selected {
+  border: 1px solid rgb(58, 58, 58);
+  box-shadow: #666666 3px 3px 0px;
+}
+
+.react-flow__edge.selected {
+  stroke: #000000 !important;
+}
+
+.react-flow__edge {
+  stroke: #666666 !important;
+}
+
+.react-flow__handle {
+  background-color: white !important; /* Change handle background color */
+  border-width: 2px !important;
+  width: 12px !important; /* Adjust handle size */
+  height: 12px !important;
+  border: 2px solid;
+  /* margin: -1px 0px; */
+  opacity: 0.75;
+  /* transition: opacity 0.2s; */
+  /* Add these properties for better proximity connection */
+  pointer-events: none;
+}
+
+.react-flow__handle.source-handle {
+  background-color: rgba(72, 199, 142, 0.2) !important;
+  border-color: rgba(72, 199, 142, 0.5) !important;
+}
+
+.react-flow__handle.target-handle {
+  background-color: rgba(243, 82, 82, 0.2) !important;
+  border-color: rgba(243, 82, 82, 0.5) !important;
+}
+
+.react-flow__handle:hover {
+  opacity: 1;
+}
+
+.react-flow__handle.connectable {
+  pointer-events: all;
+  cursor: crosshair;
+}
+
+/* Increase the connection radius for proximity connect */
+.react-flow__handle-connecting {
+  /* animation: bounce 1.5s infinite;
+  pointer-events: all; */
+}
+
+.react-flow__handle-valid {
+  /* background-color: #55dd55 !important;
+  border-color: #44aa44 !important; */
+}
+
+.react-flow__handle.disabled-handle {
+  opacity: 0.2 !important;
+  pointer-events: none !important;
+}
+
+/* Handle bar styles */
+.disabled-handle-bar {
+  background-color: #ccc !important;
+  cursor: not-allowed;
+}
+
+/* Visual feedback for active source handle */
+.react-flow__handle.active-source {
+  background-color: #4f46e5 !important;
+  border-color: #4338ca !important;
+}
+
+@keyframes bounce {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+}
+
+/* Node Toolbar styles */
+.node-toolbar {
+    transition: all 0.2s ease;
+    pointer-events: all;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    border: 1px solid #e5e7eb;
+}
+
+.node-toolbar button {
+    padding: 4px 8px;
+    transition: background-color 0.2s;
+}
+
+.node-toolbar button:hover {
+    background-color: #f3f4f6;
+}
+
+/* Edge interaction styles */
+.react-flow__edge.editable {
+    cursor: pointer;
+}
+
+.react-flow__edge.selected .react-flow__edge-path {
+    stroke-width: 3;
+}
+
+.react-flow__edge-path {
+    cursor: pointer;
+}
+
+.react-flow__edge:hover .react-flow__edge-path {
+    stroke-width: 3;
+}
