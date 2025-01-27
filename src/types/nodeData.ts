@@ -7,6 +7,7 @@ export interface NodeData {
     extends?: string[];
     implements?: string[];
     position: { x: number; y: number };
+    code?: string;
 }
 
 export interface Property {

@@ -18,6 +18,8 @@ interface NodeProps {
   isConnectable: boolean;
 }
 
+const sideHandleCount = 10;
+const centerHandleCount = 20;
 const tranY=90;
 
 const UmlNode = ({ data, isConnectable, selected }: NodeProps & { selected: boolean }) => {
@@ -87,16 +89,16 @@ const UmlNode = ({ data, isConnectable, selected }: NodeProps & { selected: bool
       <div className="absolute -top-3 left-0 w-full flex-row" style={{ transform: `translateY(${{tranY}}%)`, display:'flex'}}>
         <div className="h-3 bg-gray-400 w-3/12 rounded-sm relative">
           {/* Hidden handles for connections */}
-          {Array.from({ length: 10 }).map((_, i) => (
+          {Array.from({ length: sideHandleCount }).map((_, i) => (
             <Handle
               key={`target-${i}`}
-              id={`target-${i}`}
+              id={`target-top-${i}`}
               type="target"
               position={Position.Top}
               style={{
                 opacity: 0,
                 position: 'absolute',
-                left: `${(i / 24) * 100}%`,
+                left: `${(i / sideHandleCount) * 100}%`,
                 transform: `translateY(0%)`,
                 top: 0,
                 width: '8px',
@@ -109,16 +111,16 @@ const UmlNode = ({ data, isConnectable, selected }: NodeProps & { selected: bool
         </div>
         <div className="h-3 bg-green-400 w-6/12 rounded-sm relative">
           {/* Hidden handles for connections */}
-          {Array.from({ length: 20 }).map((_, i) => (
+          {Array.from({ length: centerHandleCount }).map((_, i) => (
             <Handle
               key={`source-${i}`}
-              id={`source-${i}`}
+              id={`source-top-${i}`}
               type="source"
               position={Position.Top}
               style={{
                 opacity: 0,
                 position: 'absolute',
-                left: `${(i / 24) * 100}%`,
+                left: `${(i / centerHandleCount) * 100}%`,
                 transform: `translateY(0%)`,
                 top: 0,
                 width: '8px',
@@ -131,16 +133,16 @@ const UmlNode = ({ data, isConnectable, selected }: NodeProps & { selected: bool
         </div>
         <div className="h-3 bg-gray-400 w-3/12 rounded-sm relative">
           {/* Hidden handles for connections */}
-          {Array.from({ length: 10 }).map((_, i) => (
+          {Array.from({ length: sideHandleCount }).map((_, i) => (
             <Handle
               key={`target-${i+10}`}
-              id={`target-${i+10}`}
+              id={`target-top-${i+10}`}
               type="target"
               position={Position.Top}
               style={{
                 opacity: 0,
                 position: 'absolute',
-                left: `${(i / 24) * 100}%`,
+                left: `${(i / sideHandleCount) * 100}%`,
                 transform: `translateY(0%)`,
                 top: 0,
                 width: '8px',
@@ -406,6 +408,15 @@ const UmlNode = ({ data, isConnectable, selected }: NodeProps & { selected: bool
         </div>
 
         <Separator />
+
+        {/* Display generated code if it exists */}
+        {/* {editableNode.code && (
+          <div className="p-2">
+            <div className="font-semibold mb-1">Generated Code:</div>
+            <pre className="text-xs bg-gray-100 p-2 rounded">{editableNode.code}</pre>
+          </div>
+        )} */}
+
         {isEditMode &&
           <div className="flex justify-end p-2">
             <button onClick={handleSave} className="mr-2 text-green-500">
@@ -434,16 +445,16 @@ const UmlNode = ({ data, isConnectable, selected }: NodeProps & { selected: bool
         <div className="absolute -bottom-1 left-0 w-full" style={{ transform: 'translateY(50%)', display:'flex'}}>
         <div className="h-3 bg-green-400 w-3/12 rounded-sm relative">
           {/* Hidden handles for connections */}
-          {Array.from({ length: 10 }).map((_, i) => (
+          {Array.from({ length: sideHandleCount }).map((_, i) => (
             <Handle
               key={`source-${i+50}`}
-              id={`source-${i+50}`}
+              id={`source-bottom-${i+50}`}
               type="source"
               position={Position.Bottom}
               style={{
                 opacity: 0,
                 position: 'absolute',
-                left: `${(i / 24) * 100}%`,
+                left: `${(i / sideHandleCount) * 100}%`,
                 transform: 'translateX(-0%)',
                 bottom: 0,
                 width: '8px',
@@ -456,16 +467,16 @@ const UmlNode = ({ data, isConnectable, selected }: NodeProps & { selected: bool
         </div>
         <div className="h-3 bg-gray-400 w-6/12 rounded-sm relative px-2">
           {/* Hidden handles for connections */}
-          {Array.from({ length: 20 }).map((_, i) => (
+          {Array.from({ length: centerHandleCount }).map((_, i) => (
             <Handle
               key={`target-${i+50}`}
-              id={`target-${i+50}`}
+              id={`target-bottom-${i+50}`}
               type="target"
               position={Position.Bottom}
               style={{
                 opacity: 0,
                 position: 'absolute',
-                left: `${(i / 24) * 100}%`,
+                left: `${(i / centerHandleCount) * 100}%`,
                 transform: 'translateY(-0%)',
                 bottom: 0,
                 width: '8px',
@@ -478,16 +489,16 @@ const UmlNode = ({ data, isConnectable, selected }: NodeProps & { selected: bool
         </div>
         <div className="h-3 bg-green-400 w-3/12 rounded-sm relative">
           {/* Hidden handles for connections */}
-          {Array.from({ length: 10 }).map((_, i) => (
+          {Array.from({ length: sideHandleCount }).map((_, i) => (
             <Handle
               key={`source-${i+160}`}
-              id={`source-${i+160}`}
+              id={`source-bottom-${i+160}`}
               type="source"
               position={Position.Bottom}
               style={{
                 opacity: 0,
                 position: 'absolute',
-                left: `${(i / 24) * 100}%`,
+                left: `${(i / sideHandleCount) * 100}%`,
                 transform: 'translateX(-0%)',
                 bottom: 0,
                 width: '8px',
