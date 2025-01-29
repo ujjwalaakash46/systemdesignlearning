@@ -1,6 +1,6 @@
 import { Method, NodeData, Parameter, Property, Visibility, visibilitySymbols } from "@/types/nodeData";
-import { useCallback, useState } from "react";
-import { Connection, Handle, Position } from "reactflow";
+import { useEffect, useState, memo } from "react";
+import { Handle, Position } from "reactflow";
 import { Input } from "../ui/input";
 import { Separator } from "../ui/separator";
 import { Button } from "../ui/button";
@@ -22,7 +22,7 @@ const sideHandleCount = 10;
 const centerHandleCount = 20;
 const tranY=90;
 
-const UmlNode = ({ data, isConnectable, selected }: NodeProps & { selected: boolean }) => {
+const UmlNode = memo(({ data, isConnectable, selected }: NodeProps & { selected: boolean }) => {
   const [isEditMode, setIsEditMode] = useState(false);
   const [editableNode, setEditableNode] = useState(data.node);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -38,13 +38,19 @@ const UmlNode = ({ data, isConnectable, selected }: NodeProps & { selected: bool
     }));
   };
 
-  useCallback(() => {
+  useEffect(() => {
     setEditableNode(data.node);
+    // Force re-render when data.node changes
+    setIsEditMode(false);
   }, [data.node]);
 
   const handleSave = () => {
     setIsEditMode(false);
-    data.onChange(editableNode); // Update the parent state
+    const updatedNode = {...editableNode, 
+      methods: editableNode.methods.filter(method => method.name !== ''),
+      properties: editableNode.properties.filter(property => property.name !== '')
+    };
+    data.onChange(updatedNode); // Update the parent state
   };
 
   const handleCancel = () => {
@@ -512,6 +518,13 @@ const UmlNode = ({ data, isConnectable, selected }: NodeProps & { selected: bool
       </div>
     </div>
   );
-};
+}, (prevProps, nextProps) => {
+  // Only re-render if these props change
+  return (
+    prevProps.data.node === nextProps.data.node &&
+    prevProps.selected === nextProps.selected &&
+    prevProps.isConnectable === nextProps.isConnectable
+  );
+});
 
 export default UmlNode;

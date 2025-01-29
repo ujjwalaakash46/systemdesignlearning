@@ -11,7 +11,6 @@ import { NodeType, ConnectionType, NodeData, Visibility, Property, Method } from
 import { ConnectionTypeSelector } from "./ConnectionTypeSelector";
 import { customAlphabet } from 'nanoid';
 import CustomEdge from './CustomEdge';
-import { MdContentCopy } from "react-icons/md";
 
 const proOptions = { hideAttribution: true };
 
@@ -177,7 +176,7 @@ export default function CodeFlow() {
             color: '#666666',
         },
 
-        animated: true,
+        // animated: true,
         data: { connectionType: ConnectionType.INHERITANCE },
         // style: {
         //     strokeWidth: 2,
@@ -224,6 +223,9 @@ export default function CodeFlow() {
 
                 nodeCode += method.parameters.map(parameter => `${parameter.type} ${parameter.name}`).join(", ");
                 nodeCode += " ){\n";
+
+                isConstructor?nodeCode += method.parameters.map(parameter => `this.${parameter.name} = ${parameter.name}`).join(";\n"):null;
+
                 nodeCode += "  }\n";
             });
 
@@ -263,9 +265,6 @@ export default function CodeFlow() {
     //     } else if (edge.data.connectionType === ConnectionType.AGGREGATION) { }
 
     //     //code update
-
-
-
     //     if (sourceNode) {
     //         const updatedSourceNode = nodeToCode(sourceNode);
     //         const updatedNodes = nodes.map(node => {
@@ -285,7 +284,6 @@ export default function CodeFlow() {
 
         const extendsName = relatedEdges.filter(edge => edge.data.connectionType === ConnectionType.INHERITANCE).map(edge => nodes.find(n => n.id === edge.target)?.data.node.name).join(", ");
 
-        // const compositionList = relatedEdges.filter(edge => edge.data.connectionType === ConnectionType.COMPOSITION).map(edge => nodes.find(n => n.id === edge.target)?.data.node.name).join(", ");
 
         let nodeCode = "";
 
@@ -333,16 +331,16 @@ export default function CodeFlow() {
         // setCode(code);
     }
 
-    const compileCodeToUml = () => {
-
-        //code => node code => edges
-
-        // Implement the logic to parse code and update nodes and edges
-        // For example:
-        // const parsedNodes = CodeGenerator.parseTypeScriptCode(code);
-        // setNodes(parsedNodes);
-        // setEdges(parsedEdges);
-    };
+    const compileCodeToUml = useCallback(() => {
+        // try {
+        //     const { nodes: newNodes, edges: newEdges } = parseJavaCode(code);
+        //     setNodes(newNodes);
+        //     setEdges(newEdges);
+        // } catch (error) {
+        //     console.error('Failed to parse Java code:', error);
+        //     // Optionally show an error message to the user
+        // }
+    }, [code]);
 
     const onConnect = useCallback(
         (params: Connection) => {
@@ -390,11 +388,30 @@ export default function CodeFlow() {
         );
     }, []);
 
+    function isValidEdgeForEnum(sourceType: NodeType, targetType: NodeType, edgeType: ConnectionType): boolean {
+        switch (edgeType) {
+            case ConnectionType.INHERITANCE:
+                // Enums cannot inherit from any other type.
+                return !(sourceType === NodeType.ENUM || targetType === NodeType.ENUM);
+            case ConnectionType.IMPLEMENTATION:
+                // Enums can implement interfaces.
+                return sourceType === NodeType.ENUM && targetType === NodeType.INTERFACE;
+            case ConnectionType.COMPOSITION:
+            case ConnectionType.AGGREGATION:
+                // Enums cannot be part of a composition or aggregation.
+                return !(sourceType === NodeType.ENUM || targetType === NodeType.ENUM);
+            case ConnectionType.DEPENDENCY:
+                // Dependency is allowed for enums as source or target.
+                return true;
+            default:
+                return false;
+        }
+    }
+
     const handleConnectionTypeSelect = (type: ConnectionType) => {
         if (!pendingConnection) {
             return;
         }
-
 
         const [newEdgeId, newEdgeReverseredId] = generateEdgeId(pendingConnection.connection, type);
         const source = pendingConnection.connection.source;
@@ -404,7 +421,17 @@ export default function CodeFlow() {
 
         console.log('new edge id', newEdgeId);
 
-        if (edges.find(edge => edge.id === newEdgeId || edge.id === newEdgeReverseredId)) {
+        if(sourceNode.type === NodeType.ENUM || targetNode.type === NodeType.ENUM){
+            //interface
+            if(!isValidEdgeForEnum(sourceNode.type, targetNode.type, type)){
+                //error message
+                setPendingConnection(null);
+                return;
+
+            }
+        }
+
+        else if (edges.find(edge => edge.id === newEdgeId || edge.id === newEdgeReverseredId)) {
             //error message
             //make sure the connection is not already present
             setPendingConnection(null);
@@ -429,7 +456,9 @@ export default function CodeFlow() {
                 return;
             }
         } else if (type === ConnectionType.COMPOSITION) {
-            if (!(targetNode.type === NodeType.CLASS && sourceNode.type === NodeType.CLASS)) {
+
+            const isAggergationPresent = edges.find(edge => edge.source === source && edge.target === target && edge.data.connectionType === ConnectionType.AGGREGATION);
+            if (!(targetNode.type === NodeType.CLASS && sourceNode.type === NodeType.CLASS) || isAggergationPresent) {
                 //error message
                 setPendingConnection(null);
                 return;
@@ -460,7 +489,9 @@ export default function CodeFlow() {
 
 
         } else if (type === ConnectionType.AGGREGATION) {
-            if (!(targetNode.type === NodeType.CLASS && sourceNode.type === NodeType.CLASS)) {
+
+            const isCompositionPresent = edges.find(edge => edge.source === source && edge.target === target && edge.data.connectionType === ConnectionType.COMPOSITION);
+            if (!(targetNode.type === NodeType.CLASS && sourceNode.type === NodeType.CLASS) || isCompositionPresent) {
                 //error message
                 setPendingConnection(null);
                 return;
@@ -509,6 +540,10 @@ export default function CodeFlow() {
         });
         setChangeTracker(changeTracker + 1);
     };
+
+    useEffect(() => {
+        console.log("chcc", nodes);
+    }, [nodes]);
 
     const onEdgesDelete = useCallback((edgesToDelete: Edge[]) => {
         console.log('edges to delete', edgesToDelete);
@@ -589,12 +624,12 @@ export default function CodeFlow() {
         const id = generateId();
         const newNode = {
             id: id,
-            position: { x: Math.random() * 500, y: Math.random() * 300 }, type: 'umlNode',
+            position: { x: 100 + nodes.length*20, y: 100 + nodes.length*20}, type: 'umlNode',
             data: {
                 onChange: (node: NodeData) => handleNodeChange(node),
                 node: {
                     id: id,
-                    name: 'MyClass',
+                    name: 'MyClass'+(nodes.length+1),
                     type: type,
                     properties: [{
                         isStatic: false,
@@ -609,7 +644,7 @@ export default function CodeFlow() {
                         parameters: [],
                         visibility: Visibility.PUBLIC
                     }],
-                    position: { x: 0, y: 0 }
+                    position: { x: 100, y: 100 }
                 }
             }
         };

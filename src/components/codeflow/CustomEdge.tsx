@@ -1,4 +1,4 @@
-import { BaseEdge, EdgeProps, getSmoothStepPath, useStore } from 'reactflow';
+import { BaseEdge, EdgeProps, getSmoothStepPath } from 'reactflow';
 
 function CustomEdge({
   id,
@@ -10,11 +10,10 @@ function CustomEdge({
   targetPosition,
   style = {},
   markerEnd,
-  data,
   selected,
 //   onClick
 }: EdgeProps) {
-  const [edgePath, labelX, labelY] = getSmoothStepPath({
+  const [edgePath] = getSmoothStepPath({
     sourceX,
     sourceY,
     sourcePosition,
@@ -23,7 +22,6 @@ function CustomEdge({
     targetPosition,
   });
   
-  const isUpward = sourceY > targetY;
   
   return (
     <BaseEdge

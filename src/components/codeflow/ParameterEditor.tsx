@@ -32,7 +32,8 @@ const ParameterEditor = ({ parameters, onChange, onCancel }: ParameterEditorProp
     };
 
     const handleSave = () => {
-        onChange(editableParameters);
+        const updatedParameters = editableParameters.filter((parameter) => parameter.name !== "" && parameter.type !== "");
+        onChange(updatedParameters);
     };
 
     return (

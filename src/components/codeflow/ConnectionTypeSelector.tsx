@@ -9,7 +9,7 @@ interface ConnectionTypeSelectorProps {
     onCancel: () => void;
 }
 
-export function ConnectionTypeSelector({ position, onSelect, onCancel }: ConnectionTypeSelectorProps) {
+export function ConnectionTypeSelector({ onSelect, onCancel }: ConnectionTypeSelectorProps) {
     const [isOpen, setIsOpen] = useState(true);
     const dropdownRef = useRef<HTMLDivElement>(null);
 
