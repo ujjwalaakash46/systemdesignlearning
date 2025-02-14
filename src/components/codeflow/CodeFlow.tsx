@@ -7,10 +7,13 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import 'reactflow/dist/style.css';
 import '../../styles/reactflow.css';
 import umlNode from "./UmlNode";
-import { NodeType, ConnectionType, NodeData, Visibility, Property, Method } from "@/types/nodeData";
+import { NodeType, ConnectionType, NodeData, Visibility, Property, Method, EdgeMetadata } from "@/types/nodeData";
 import { ConnectionTypeSelector } from "./ConnectionTypeSelector";
 import { customAlphabet } from 'nanoid';
 import CustomEdge from './CustomEdge';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "../ui/tabs";
+import codeService from '../../services/api/code.service';
+import { NodeEditDialog } from "./NodeEditDialog";
 
 const proOptions = { hideAttribution: true };
 
@@ -95,143 +98,128 @@ const getEdgeStyle = (type: ConnectionType, isTargetTop: boolean) => {
 
 
 
-export default function CodeFlow() {
+interface Props {
+    initialNodes: Node[];
+    initialEdgesMetadata: EdgeMetadata[];
+    initialMainCode: { code: string, result: string };
+}
 
-
-    const onInit = (reactFlowInstance: ReactFlowInstance) => reactFlowInstance.zoomTo(0.8);
-
-    const initialNodes: Node[] = [{
-        id: '1',
-        position: { x: 0, y: 0 },
-        data: {
-            node: {
-                id: '1',
-                name: 'MyClass',
-                type: NodeType.CLASS,
-                properties: [{
-                    isStatic: false,
-                    name: 'id',
-                    type: 'string',
-                    visibility: Visibility.PRIVATE
-                }],
-                methods: [{
-                    isStatic: false,
-                    name: 'getId',
-                    returnType: 'string',
-                    parameters: [],
-                    visibility: Visibility.PUBLIC
-                }],
-                position: { x: 0, y: 0 }
-            },
-            onChange: (node: NodeData) => handleNodeChange(node)
-        },
-        type: 'umlNode'
-    }, {
-        id: "2",
-        type: "umlNode", // Use the custom node type
-        position: { x: 100, y: 100 },
-        data: {
-            onChange: (node: NodeData) => handleNodeChange(node),
-            node: {
-
-                id: "2",
-                name: "Person",
-                type: NodeType.CLASS,
-                properties: [
-                    { isStatic: false, name: "name", type: "String", visibility: Visibility.PRIVATE },
-                    { isStatic: false, name: "age", type: "int", visibility: Visibility.PROTECTED },
-                ],
-                methods: [
-                    {
-                        isStatic: false,
-                        name: "getName",
-                        returnType: "String",
-                        parameters: [],
-                        visibility: Visibility.PUBLIC,
-                    },
-                    {
-                        isStatic: false,
-                        name: "setAge",
-                        returnType: "void",
-                        parameters: [{ name: "age", type: "int" }],
-                        visibility: Visibility.PUBLIC,
-                    },
-                ],
-            }
-        },
-    },
-    ];
-
-
-
-    const initialEdges: Edge[] = [{
-        id: 'e1-2', source: '2', target: '1', type: 'smoothstep',
-        style: {
-            strokeWidth: 2,
-        },
-        markerEnd: {
-            type: MarkerType.ArrowClosed,
-            width: 20,
-            height: 20,
-            color: '#666666',
-        },
-
-        // animated: true,
-        data: { connectionType: ConnectionType.INHERITANCE },
-        // style: {
-        //     strokeWidth: 2,
-        //     stroke: '#FF0072',
-        // },
-    }];
-
-
-
-    const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-    const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+export default function CodeFlow({ initialNodes, initialEdgesMetadata, initialMainCode }: Props) {
+    const [code, setCode] = useState<string>("");
+    const [mainCode, setMainCode] = useState<string>(initialMainCode.code);
     const [changeTracker, setChangeTracker] = useState<number>(0);
 
+    
     const [pendingConnection, setPendingConnection] = useState<{
         connection: Connection;
         position: { x: number; y: number }
     } | null>(null);
-    const [code, setCode] = useState<string>("");
     const [selectedNode, setSelectedNode] = useState<Node | null>(null);
+    
+    const [isExecuting, setIsExecuting] = useState(false);
+    const [executionResult, setExecutionResult] = useState<string>(initialMainCode.result);
+    
+    const [activeTab, setActiveTab] = useState("main");
+    const [editingNode, setEditingNode] = useState<NodeData | null>(null);
+
+    useEffect(() => {
+        if (initialNodes?.length) {
+            compileUmlToCode();
+        }
+    }, []);
+    
+    const convertMetaEdgesToEdges = (initialEdges: EdgeMetadata[]): Edge[] => {
+        return initialEdges.map((em: EdgeMetadata) => {
+            return {
+                ...getEdgeStyle(em.connectionType, em.targetHandle?.startsWith('top')!),
+                id: em.id,
+                source: em.source,
+                target: em.target,
+                type: 'custom',
+                sourceHandle: em.sourceHandle,
+                targetHandle: em.targetHandle,
+                
+                // animated: true,
+                data: { connectionType: em.connectionType },
+            }
+        })
+    }
+    
+    const handleNodeChange = (newData: NodeData) => {
+        setNodes((nds) => {
+            const index = nds.findIndex(node => node.id === newData.id);
+            if (index === -1) return nds;
+            nds[index].data.node = newData;
+            return [...nds];
+        });
+        setChangeTracker(changeTracker + 1);
+    };
+
+    const handleEdit = (node: NodeData) => {
+        setEditingNode(node);
+    }
+
+    const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes.map((node) => ({
+        ...node,
+        data: {
+            ...node.data,
+            onChange: handleNodeChange,
+            onEdit: handleEdit, // pass callback for edit
+        }
+    })));
+    
+    
+    const [edges, setEdges, onEdgesChange] = useEdgesState(convertMetaEdgesToEdges(initialEdgesMetadata));
 
 
     const compileUmlToCode = () => {
-        let code = "";
+        let generatedCode = "";
         const updatedNodes = nodes.map(node => {
             let relatedEdges = edges.filter(edge => edge.source === node.id);
             let implementsName = relatedEdges.filter(edge => edge.data.connectionType === ConnectionType.IMPLEMENTATION).map(edge => nodes.find(n => n.id === edge.target)?.data.node.name).join(", ");
             let extendsName = relatedEdges.filter(edge => edge.data.connectionType === ConnectionType.INHERITANCE).map(edge => nodes.find(n => n.id === edge.target)?.data.node.name).join(", ");
             let nodeCode = "";
 
-            nodeCode += `class ${node.data.node.name} ${extendsName ? 'extends ' + extendsName : ''} ${implementsName ? 'implements ' + implementsName : ''} {\n`;
+            nodeCode += `class ${node.data.node.name} ${extendsName ? 'extends ' + extendsName : ''} ${implementsName ? 'implements ' + implementsName : ''} {\n\n`;
 
+            //properties
             node.data.node.properties.forEach((property: Property) => {
 
-                nodeCode += ` ${property.isStatic ? 'static ' : ' '}${property.visibility} ${property.type} ${property.name};\n`;
+                nodeCode += `  ${property.isStatic ? 'static ' : ''}${property.isFinal ? 'final ' : ''}${property.visibility} ${property.type} ${property.name}${property.initialValue?' = '+property.initialValue:''};\n`;
             });
             nodeCode += "\n";
+
+            //methods
             node.data.node.methods.forEach((method: Method) => {
+
+                //method signature
                 const isConstructor = node.data.node.name === method.name;
                 if (isConstructor) {
                     nodeCode += `  ${method.visibility} ${node.data.node.name}(`;
                 } else {
-                    nodeCode += `  ${method.isStatic ? 'static ' : ' '} ${method.visibility} ${method.returnType} ${method.name}(`;
+                    nodeCode += `  ${method.isStatic ? 'static ' : ''}${method.isFinal ? 'final ' : ''}${method.visibility} ${method.returnType} ${method.name}(`;
                 }
 
-                nodeCode += method.parameters.map(parameter => `${parameter.type} ${parameter.name}`).join(", ");
-                nodeCode += " ){\n";
+                //method parameters
+                nodeCode += method.parameters.map(parameter => `${parameter.type} ${parameter.name}`).join(", ") + " ){\n";
+                
+                //if contructor, assign parameters to properties
 
-                isConstructor?nodeCode += method.parameters.map(parameter => `this.${parameter.name} = ${parameter.name}`).join(";\n"):null;
+                if(method.insideCode){
+                    nodeCode += method.insideCode;
+                }else{
+                    isConstructor ? nodeCode += method.parameters.map(parameter => `this.${parameter.name} = ${parameter.name}`).join(";\n") : null;
+                }
 
-                nodeCode += "  }\n";
+
+
+                //end of method
+                nodeCode += '\n  }\n\n';
             });
 
-            nodeCode += "}\n";
+            nodeCode += '}\n\n';
 
-            code += nodeCode;
+            generatedCode += nodeCode;
 
             return {
                 ...node,
@@ -245,90 +233,10 @@ export default function CodeFlow() {
             };
         });
         setNodes(updatedNodes);
-        setCode(code);
-    }
+        setCode(generatedCode);
 
-    // const updateNodeByEdge = (edge: Edge) => {
-    //     let sourceNode = nodes.find(n => n.id === edge.source)?.data.node;
-    //     const targetNode = nodes.find(n => n.id === edge.target)?.data.node;
-
-    //     //prop/method update
-    //     if (edge.data.connectionType === ConnectionType.COMPOSITION) {
-    //         const prop: Property = { name: targetNode.name, type: targetNode.name, visibility: Visibility.PUBLIC, isStatic: false };
-    //         sourceNode.properties.push(prop);
-
-    //         let constructor = sourceNode.methods.find((method: Method) => method.name === sourceNode.name);
-    //         if (constructor) {
-    //             constructor.parameters.push({ name: targetNode.name, type: targetNode.name });
-    //         }
-
-    //     } else if (edge.data.connectionType === ConnectionType.AGGREGATION) { }
-
-    //     //code update
-    //     if (sourceNode) {
-    //         const updatedSourceNode = nodeToCode(sourceNode);
-    //         const updatedNodes = nodes.map(node => {
-    //             if (node.id === updatedSourceNode.id) {
-    //                 return updatedSourceNode;
-    //             }
-    //             return node;
-    //         });
-    //         setNodes(updatedNodes);
-    //     }
-    // }
-
-    const nodeToCode = (node: Node) => {
-        const relatedEdges = edges.filter(edge => edge.source === node.id);
-
-        const implementsName = relatedEdges.filter(edge => edge.data.connectionType === ConnectionType.IMPLEMENTATION).map(edge => nodes.find(n => n.id === edge.target)?.data.node.name).join(", ");
-
-        const extendsName = relatedEdges.filter(edge => edge.data.connectionType === ConnectionType.INHERITANCE).map(edge => nodes.find(n => n.id === edge.target)?.data.node.name).join(", ");
-
-
-        let nodeCode = "";
-
-        //class name
-        nodeCode += `class ${node.data.node.name} ${extendsName ? 'extends ' + extendsName : ''} ${implementsName ? 'implements ' + implementsName : ''} {\n`;
-
-        //properties
-        node.data.node.properties.forEach((property: Property) => {
-
-            nodeCode += ` ${property.isStatic ? 'static ' : ' '}${property.visibility} ${property.type} ${property.name};\n`;
-        });
-        nodeCode += "\n";
-
-        //methods
-        node.data.node.methods.forEach((method: Method) => {
-            const isConstructor = node.data.node.name === method.name;
-            if (isConstructor) {
-                nodeCode += `  ${method.visibility} ${node.data.node.name}(`;
-            } else {
-                nodeCode += `  ${method.isStatic ? 'static ' : ' '} ${method.visibility} ${method.returnType} ${method.name}(`;
-            }
-
-            nodeCode += method.parameters.map(parameter => `${parameter.type} ${parameter.name}`).join(", ");
-            nodeCode += " ){\n";
-
-            //method's code
-
-            nodeCode += "  }\n";
-        });
-
-        nodeCode += "}\n";
-
-
-        return {
-            ...node,
-            data: {
-                ...node.data,
-                node: {
-                    ...node.data.node,
-                    code: nodeCode
-                }
-            }
-        };
-
-        // setCode(code);
+        // const allCode = `${generatedCode}\n\n${mainCode}`;
+        setCode(generatedCode);
     }
 
     const compileCodeToUml = useCallback(() => {
@@ -421,9 +329,9 @@ export default function CodeFlow() {
 
         console.log('new edge id', newEdgeId);
 
-        if(sourceNode.type === NodeType.ENUM || targetNode.type === NodeType.ENUM){
+        if (sourceNode.type === NodeType.ENUM || targetNode.type === NodeType.ENUM) {
             //interface
-            if(!isValidEdgeForEnum(sourceNode.type, targetNode.type, type)){
+            if (!isValidEdgeForEnum(sourceNode.type, targetNode.type, type)) {
                 //error message
                 setPendingConnection(null);
                 return;
@@ -465,13 +373,13 @@ export default function CodeFlow() {
             }
 
             //update the source node
-            const prop: Property = { name: targetNode.name, type: targetNode.name, visibility: Visibility.PRIVATE, isStatic: false };
+            const prop: Property = { name: targetNode.name, type: targetNode.name, visibility: Visibility.PRIVATE, isStatic: false , isFinal:false};
             sourceNode.properties.push(prop);
 
             let constructor = sourceNode.methods.find((method: Method) => method.name === sourceNode.name);
             if (!constructor) {
                 constructor = {
-                    isStatic: false, name: sourceNode.name, returnType: '', parameters: [
+                    isStatic: false, isFinal:false, name: sourceNode.name, returnType: '', parameters: [
                         { name: toCamelCase(targetNode.name), type: toPascelCase(targetNode.name) }
                     ], visibility: Visibility.PUBLIC
                 };
@@ -497,7 +405,7 @@ export default function CodeFlow() {
                 return;
             }
 
-            const prop: Property = { name: targetNode.name, type: targetNode.name, visibility: Visibility.PRIVATE, isStatic: false };
+            const prop: Property = { name: targetNode.name, type: targetNode.name, visibility: Visibility.PRIVATE, isStatic: false , isFinal:false};
             sourceNode.properties.push(prop);
         } else if (type === ConnectionType.DEPENDENCY) {
             if (!(targetNode.type === NodeType.CLASS && sourceNode.type === NodeType.CLASS)) {
@@ -510,8 +418,6 @@ export default function CodeFlow() {
         //conditions
 
         const isTargetHandlerOnTop = pendingConnection.connection.targetHandle?.includes('top')!;
-        console.log('is target top', isTargetHandlerOnTop, pendingConnection.connection);
-
 
         const edgeStyle = getEdgeStyle(type, isTargetHandlerOnTop);
         const newEdge: Edge = {
@@ -531,19 +437,36 @@ export default function CodeFlow() {
         setPendingConnection(null);
     }, []);
 
-    const handleNodeChange = (newData: NodeData) => {
-        setNodes((nds) => {
-            const index = nds.findIndex(node => node.id === newData.id);
-            if (index === -1) return nds;
-            nds[index].data.node = newData;
-            return [...nds];
-        });
-        setChangeTracker(changeTracker + 1);
-    };
 
-    useEffect(() => {
-        console.log("chcc", nodes);
-    }, [nodes]);
+
+    const executeCode = async () => {
+        setIsExecuting(true);
+        try {
+            // Format the code by removing extra newlines and spaces
+            const formattedCode = code.replace(/\n\s*\n/g, '\n').trim();
+            const formattedMainCode = mainCode.replace(/\n\s*\n/g, '\n').trim();
+
+            // Combine code in proper order for compilation
+            // const fullCode = `${formattedCode}\n\n${formattedMainCode}`;
+
+            const response: any = await codeService.executeCode({
+                code: formattedCode,
+                main: formattedMainCode // We don't need to send main separately since it's combined
+            });
+
+            if (response.error || response.stderr || response.compile_output) {
+                setExecutionResult(`Error: ${response.error || response.compile_output || response.stderr}`);
+            } else {
+                setExecutionResult(response.stdout);
+            }
+            setActiveTab('result');
+        } catch (error) {
+            setExecutionResult(`Error executing code: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            setActiveTab('result');
+        } finally {
+            setIsExecuting(false);
+        }
+    };
 
     const onEdgesDelete = useCallback((edgesToDelete: Edge[]) => {
         console.log('edges to delete', edgesToDelete);
@@ -595,52 +518,34 @@ export default function CodeFlow() {
     };
 
     useEffect(() => {   // Update code when nodes change
-        console.log('nodes changed', nodes);
         compileUmlToCode();
+        setActiveTab("code");
 
     }, [changeTracker, nodes.length, edges.length]);
-
-    const updateNodeByNodeDate = (nodeData: NodeData) => {
-        setNodes((nds) => {
-            const updatedNodes = nds.map(node => {
-                if (node.id === nodeData.id) {
-                    return {
-                        ...node,
-                        data: {
-                            ...node.data,
-                            node: nodeData
-                        }
-                    };
-                }
-                return node;
-            });
-            return updatedNodes;
-        });
-        setChangeTracker(changeTracker + 1);
-    }
 
 
     const addNode = (type: NodeType) => {
         const id = generateId();
         const newNode = {
             id: id,
-            position: { x: 100 + nodes.length*20, y: 100 + nodes.length*20}, type: 'umlNode',
+            position: { x: 100 + nodes.length * 20, y: 100 + nodes.length * 20 }, type: 'umlNode',
             data: {
                 onChange: (node: NodeData) => handleNodeChange(node),
+                onEdit: handleEdit,
                 node: {
                     id: id,
-                    name: 'MyClass'+(nodes.length+1),
+                    name: 'MyClass' + (nodes.length + 1),
                     type: type,
                     properties: [{
                         isStatic: false,
                         name: 'id',
-                        type: 'string',
+                        type: 'String',
                         visibility: Visibility.PRIVATE
                     }],
                     methods: [{
                         isStatic: false,
                         name: 'getId',
-                        returnType: 'string',
+                        returnType: 'String',
                         parameters: [],
                         visibility: Visibility.PUBLIC
                     }],
@@ -653,30 +558,6 @@ export default function CodeFlow() {
             return updatedNodes;
         });
     };
-
-    // const [isConnecting, setIsConnecting] = useState(false); // Track connection state
-    // const [connectionStartNode, setConnectionStartNode] = useState(null);
-    // const [activeConnection, setActiveConnection] = useState<string | null>(null);
-
-    // const onConnectStart = useCallback((_event: any, { nodeId, handleId }: { nodeId: any, handleId: string | null }) => {
-    //     setIsConnecting(true);
-    //     setConnectionStartNode(nodeId);
-    //     if (handleId?.startsWith('source-')) {
-    //         setActiveConnection(handleId);
-    //     }
-    // }, []);
-
-    // const onConnectStop = useCallback(() => {
-    //     setIsConnecting(false);
-    //     setConnectionStartNode(null);
-    //     setActiveConnection(null);
-    // }, []);
-
-    // const isValidConnectionHandler = useCallback((connection: Connection) => {
-    //     if (!isConnecting) return false; // Prevent connections if not dragging from a source
-    //     if (connection.source === connection.target) return false;
-    //     return connection.sourceHandle !== null && connection.targetHandle !== null;
-    // }, [isConnecting]);
 
     const duplicateNode = useCallback(() => {
         if (!selectedNode) return;
@@ -693,6 +574,7 @@ export default function CodeFlow() {
             type: 'umlNode',
             data: {
                 onChange: (node: NodeData) => handleNodeChange(node),
+                onEdit: handleEdit,
                 node: {
                     ...oldNode,
                     id: newId,
@@ -714,36 +596,37 @@ export default function CodeFlow() {
     }, []);
 
 
-    const handleEditorChange = useCallback((value: string | undefined) => {
+    const handleCodeEditorChange = useCallback((value: string | undefined) => {
         if (value !== undefined) {
-            setCode(value);
+            // setCode(value);
         }
     }, []);
 
-    function handleEditorDidMount(editor: any, monaco: any) {
-        console.log('onMount: the editor instance:', editor);
-        console.log('onMount: the monaco instance:', monaco);
-    }
+    const handleMainEditorChange = useCallback((value: string | undefined) => {
+        if (value !== undefined) {
+            setMainCode(value);
+        }
+    }, []);
 
-    function handleEditorWillMount(monaco: any) {
-        console.log('beforeMount: the monaco instance:', monaco);
-    }
+    const handleSaveEdit = (updatedNode: NodeData, closeDialog: boolean) => {
+        // Update the node in state based on id
+        setNodes((nds) => nds.map(node =>
+            node.id === updatedNode.id
+                ? { ...node, data: { ...node.data, node: updatedNode } }
+                : node
+        ));
+        if(closeDialog) setEditingNode(null);
+        setChangeTracker(changeTracker + 1);
+    };
 
-    function handleEditorValidation(markers: any) {
-        // model markers
-        // markers.forEach(marker => console.log('onValidate:', marker.message));
-        console.log(markers, "marker");
-
-    }
-
-    return <>
+    return (
         <ResizablePanelGroup
             direction="horizontal"
-            className="rounded-lg border w-full h-full"
+            className="rounded-lg border border-border w-full h-full"
         >
             <ResizablePanel defaultSize={50}>
-                <div className="w-full h-full flex-grow items-center justify-center p-2">
-                    <div className="react-flow-wrapper relative">
+                <div className="w-full h-full flex-grow items-center justify-center p-2 bg-background relative">
+                    <div className="react-flow-wrapper ">
                         {pendingConnection && (
                             <ConnectionTypeSelector
                                 position={pendingConnection.position}
@@ -767,19 +650,6 @@ export default function CodeFlow() {
                                 ))}
                             </DropdownMenuContent>
                         </DropdownMenu>
-                        {/* <Button className="absolute top-12 left-2 z-20">Compile UML</Button> */}
-                        {/* <div className="absolute top-12 left-2 flex items-center justify-center h-screen"> */}
-                        <Button onClick={compileUmlToCode}
-                            className="absolute top-12 left-2 z-20 group flex items-center px-4 py-2  font-semibold rounded-lg shadow-md transition-all duration-300 hover:pl-8 hover:pr-4"
-                        >
-                            <span className="absolute text-center px-2 left-2 opacity-0 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300">
-                                To Code
-                            </span>
-                            <span className="transition-all duration-300 group-hover:opacity-0">
-                                Complie
-                            </span>
-                        </Button>
-                        {/* </div> */}
                         <svg width="0" height="0">
                             <defs>
                                 <marker
@@ -853,9 +723,9 @@ export default function CodeFlow() {
 
                         <ReactFlow
                             fitView
-                            onInit={onInit}
+                            onInit={(instance: ReactFlowInstance) => { instance.zoomTo(0.8) }}
                             proOptions={proOptions}
-                            className="bg-gray-900"
+                            className="bg-background/95 [&_.react-flow__node]:bg-background [&_.react-flow__handle]:bg-primary"
                             nodes={nodes}
                             edges={edges}
                             nodeTypes={nodeTypes}
@@ -874,7 +744,7 @@ export default function CodeFlow() {
                             connectOnClick={false}
                             defaultEdgeOptions={{
                                 type: 'custom', // Set custom as default edge type
-                                style: { stroke: '#666666' },
+                                style: { stroke: 'hsl(var(--foreground))' },
                                 markerEnd: {
                                     type: MarkerType.ArrowClosed,
                                     color: '#666666',
@@ -888,45 +758,97 @@ export default function CodeFlow() {
                             <Controls />
                             <Background />
                         </ReactFlow>
+
+                        {editingNode && (
+                          <NodeEditDialog
+                              node={editingNode}
+                              open={true}
+                              onClose={() => setEditingNode(null)}
+                              onSave={handleSaveEdit}
+                          />
+                        )}
                     </div>
                 </div>
             </ResizablePanel>
-            <ResizableHandle withHandle />
-            <ResizablePanel defaultSize={50}>
-                <div className="relative w-full h-full flex-grow items-center justify-center p-2">
-                    <Button onClick={compileCodeToUml}
-                        className="absolute top-2 right-2 z-20 group flex items-center px-4 py-2  font-semibold rounded-lg shadow-md transition-all duration-300 hover:pl-8 hover:pr-4"
-                    >
-                        <span className="absolute text-center px-2 left-2 opacity-0 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300">
-                            To UML
-                        </span>
-                        <span className="transition-all duration-300 group-hover:opacity-0">
-                            Compile
-                        </span>
-                    </Button>
-                    <Editor
-                        className=""
-                        height="100%"
-                        width="100%"
-                        defaultLanguage="java"
-                        defaultValue="// some comment"
-                        value={code}
-                        onChange={handleEditorChange}
-                        onMount={handleEditorDidMount}
-                        beforeMount={handleEditorWillMount}
-                        onValidate={handleEditorValidation}
-                        options={{
-                            selectOnLineNumbers: true,
-                            automaticLayout: true,
-                            minimap: {
-                                enabled: false
-                            },
-                            theme: 'vs-dark'
-                        }}
-                    />
-                </div>
+            <ResizableHandle withHandle className="bg-border" />
 
+            {/* Right Panel - Editor Section */}
+            <ResizablePanel defaultSize={50}>
+                <div className="relative flex flex-col h-full bg-background">
+                    {/* Buttons */}
+                    {/* <div className="absolute flex justify-end gap-2 p-2">
+
+                    </div> */}
+
+                    {/* Editors */}
+                    <div className="flex-1 min-h-0"> {/* This div ensures proper height calculation */}
+                        <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col p-2">
+                            <TabsList className="bg-muted">
+                                <TabsTrigger value="code">Code</TabsTrigger>
+                                <TabsTrigger value="main">Main</TabsTrigger>
+                                <TabsTrigger value="result">Result</TabsTrigger>
+
+                                <Button className="ml-auto"
+                                    onClick={executeCode}
+                                    disabled={isExecuting}
+                                >
+                                    {isExecuting ? 'Executing...' : 'Execute'}
+                                </Button>
+                                <Button onClick={compileCodeToUml}>
+                                    Convert to UML
+                                </Button>
+                            </TabsList>
+
+                            <div className="flex-1 min-h-0 relative"> {/* Another container for proper sizing */}
+                                <TabsContent value="code" className="h-full m-0 pt-1">
+                                    <Editor
+
+                                        height="100%"
+                                        defaultLanguage="java"
+                                        value={code}
+                                        onChange={handleCodeEditorChange}
+                                        options={{
+                                            minimap: { enabled: false },
+                                            theme: 'vs-dark',
+                                            scrollBeyondLastLine: false,
+                                            automaticLayout: true,
+                                            readOnly: true,
+                                        }}
+                                        
+                                        // onMouseDown={() => setShowOverlay(true)}
+                                    />
+                                   
+
+                                </TabsContent>
+
+                                <TabsContent value="main" className="h-full m-0 pt-1">
+                                    <Editor
+                                        height="100%"
+                                        defaultLanguage="java"
+                                        value={mainCode}
+                                        onChange={handleMainEditorChange}
+                                        options={{
+                                            minimap: { enabled: false },
+                                            theme: 'vs-dark',
+                                            scrollBeyondLastLine: false,
+                                            automaticLayout: true
+                                        }}
+                                    />
+                                </TabsContent>
+
+                                <TabsContent value="result" className="h-full m-0 p-2">
+                                    <div className="h-full bg-muted rounded border border-border p-4">
+                                        <div className="font-bold text-foreground mb-2">Output:</div>
+                                        <pre className="text-muted-foreground font-mono text-sm warp-words w-full">
+                                            {executionResult || 'No output yet'}
+                                        </pre>
+                                    </div>
+                                </TabsContent>
+                            </div>
+                        </Tabs>
+                    </div>
+                </div>
             </ResizablePanel>
         </ResizablePanelGroup>
-    </>
+    );
 }

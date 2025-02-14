@@ -19,6 +19,7 @@ const ParameterEditor = ({ parameters, onChange, onCancel }: ParameterEditorProp
         const updatedParameters = [...editableParameters];
         updatedParameters[index][field] = value;
         setEditableParameters(updatedParameters);
+        handleSave();
     };
 
     const handleAddParameter = () => {
@@ -29,16 +30,19 @@ const ParameterEditor = ({ parameters, onChange, onCancel }: ParameterEditorProp
         const updatedParameters = [...editableParameters];
         updatedParameters.splice(index, 1);
         setEditableParameters(updatedParameters);
+        handleSave();
     };
 
     const handleSave = () => {
+        console.log("editableParameters", editableParameters);
+        
         const updatedParameters = editableParameters.filter((parameter) => parameter.name !== "" && parameter.type !== "");
         onChange(updatedParameters);
     };
 
     return (
         <div>
-            <div className="font-semibold mb-1 flex justify-between text-sm">
+            <div className="font-semibold mb-1 flex justify-between text-sm z-50">
                 <span>Parameters:</span>
                 <div className="w-8 h-8 rounded-full shadow-md justify-center items-center flex" >
                     <IoIosAddCircleOutline scale={2} size={20} style={{ strokeWidth: '10px' }} className="w-8" onClick={handleAddParameter} />
@@ -78,13 +82,15 @@ const ParameterEditor = ({ parameters, onChange, onCancel }: ParameterEditorProp
                     ))}
                     <ScrollBar orientation="vertical" />
             </ScrollArea>
-            <div className="flex justify-end my-2"></div>
-            <Button onClick={handleSave} className="mr-2 text-green-500">
-                Save
-            </Button>
+            <div className="flex justify-end my-2">
+
+            {/* <Button onClick={handleSave} className="mr-2 text-green-500">
+                Savedd
+                </Button> */}
             <Button onClick={onCancel} className="mr-2 text-red-500">
-                Cancel
+                Close
             </Button>
+                </div>
 
         </div>
     );

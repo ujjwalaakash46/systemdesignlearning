@@ -15,6 +15,8 @@ export interface Property {
     type: string;
     visibility: Visibility;
     isStatic: boolean;
+    isFinal: boolean;
+    initialValue?: string;
 }
 
 export interface Method {
@@ -23,6 +25,8 @@ export interface Method {
     parameters: Parameter[];
     visibility: Visibility;
     isStatic: boolean;
+    isFinal: boolean;
+    insideCode?: string;
 }
 
 export interface Parameter {
@@ -54,4 +58,20 @@ export enum ConnectionType {
     COMPOSITION = "Composition",
     AGGREGATION = "Aggregation",
     DEPENDENCY = "Dependency"
+}
+
+export interface EdgeMetadata {
+            id: string; 
+            source: string;
+            target: string;
+            sourceHandle: string,
+            targetHandle: string;
+            style?: any ;
+            markerEndType?: string;
+            markerEndStyle?: any,
+            markerStartType?: string;
+            markerStartStyle?: any,
+            connectionType: ConnectionType.INHERITANCE,
+            animated?:boolean,
+            isTargetTop?:boolean,
 }

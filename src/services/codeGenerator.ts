@@ -5,12 +5,12 @@ export class CodeGenerator {
     static generateTypeScriptCode(nodes: NodeData[], edges: Edge[]): string {
         return nodes.map(node => {
             const extends_ = edges
-                .filter(e => e.target === node.id && e.data?.connectionType === ConnectionType.EXTENDS)
+                .filter(e => e.target === node.id && e.data?.connectionType === ConnectionType.IMPLEMENTATION)
                 .map(e => nodes.find(n => n.id === e.source)?.name)
                 .filter(Boolean);
 
             const implements_ = edges
-                .filter(e => e.target === node.id && e.data?.connectionType === ConnectionType.IMPLEMENTS)
+                .filter(e => e.target === node.id && e.data?.connectionType === ConnectionType.INHERITANCE)
                 .map(e => nodes.find(n => n.id === e.source)?.name)
                 .filter(Boolean);
 
